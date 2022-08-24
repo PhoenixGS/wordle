@@ -1,6 +1,6 @@
 use console;
 use rand::Rng;
-use std::io::{self, Write};
+use std::{io::{self, Write}, vec};
 
 mod builtin_words;
 
@@ -29,6 +29,25 @@ fn check(guess: &String) -> bool
     return false;
 }
 
+fn check_diffcult(guess: &String, pre_delta: &Vec<i32>, delta: &Vec<i32>, pre_out: &Vec<char>, out: &Vec<char>) -> bool
+{
+    for i in 0..5
+    {
+        if pre_out[i] == 'G' && out[i] != 'G'
+        {
+            return false;
+        }
+    }
+    for i in 0..26
+    {
+        if delta[i] > pre_delta[i]
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 /// The main function for the Wordle game, implement your own logic here
 fn main() -> Result<(), Box<dyn std::error::Error>>
 {
@@ -38,6 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
     let mut is_random = false;
     let mut is_word = false;
+    let mut is_difficult = false;
 
     let mut pre: String = "".to_string();
     for arg in std::env::args()
@@ -52,7 +72,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
             let index = rand::thread_rng().gen_range(0..builtin_words::FINAL.len());
             word = String::from(builtin_words::FINAL[index]);
             is_random = true;
-            println!("{}", word);
+//            println!("{}", word);
+        }
+        if arg == "-D".to_string() || arg == "--difficult".to_string()
+        {
+            is_difficult = true;
         }
         pre = String::from(&arg);
     }
@@ -96,6 +120,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
     let mut success = false;
     let mut res = vec![];
     let mut words = vec![];
+    let mut pre_delta = vec![];
     while count < 6
     {
         let mut guess = String::new();
@@ -107,7 +132,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
             println!("INVALID");
             continue;
         }
-        count += 1;
         for i in 0..5
         {
             let c = guess.chars().nth(i).unwrap();
@@ -120,6 +144,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         }
         let mut out = vec!['S'; 5];
         let mut cnt = 0;
+        let mut new_status = status.clone();
         for i in 0..5
         {
             if word.chars().nth(i) == guess.chars().nth(i)
@@ -128,7 +153,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
                 let index = guess.chars().nth(i).unwrap() as usize - 'A' as usize;
                 delta[index] -= 1;
                 cnt += 1;
-                status[index] = 'G';
+                new_status[index] = 'G';
             }
         }
         for i in 0..5
@@ -140,21 +165,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
                 {
                     delta[index] -= 1;
                     out[i] = 'Y';
-                    if status[index] != 'G'
+                    if new_status[index] != 'G'
                     {
-                        status[index] = 'Y';
+                        new_status[index] = 'Y';
                     }
                 }
                 else
                 {
                     out[i] = 'R';
-                    if status[index] != 'G' && status[index] != 'Y'
+                    if new_status[index] != 'G' && new_status[index] != 'Y'
                     {
-                        status[index] = 'R';
+                        new_status[index] = 'R';
                     }
                 }
             }
         }
+
+        if count > 0 && is_difficult && ! check_diffcult(&guess, &pre_delta, &delta, &res[count - 1], &out)
+        {
+            println!("INVALID");
+            continue;
+        }
+
+        count += 1;
+        status = new_status.clone();
+
         res.push(out);
         words.push(guess);
         if ! is_tty
@@ -191,6 +226,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
             success = true;
             break;
         }
+        pre_delta = delta.clone();
     }
 
     if success
