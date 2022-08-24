@@ -1,4 +1,5 @@
 use console;
+use rand::Rng;
 use std::io::{self, Write};
 
 mod builtin_words;
@@ -32,9 +33,29 @@ fn check(guess: &String) -> bool
 fn main() -> Result<(), Box<dyn std::error::Error>>
 {
     let is_tty = atty::is(atty::Stream::Stdout);
-    //
-    let is_random = false;
 
+    let mut word = String::new();
+
+    let mut is_random = false;
+    let mut is_word = false;
+
+    let mut pre: String = "".to_string();
+    for arg in std::env::args()
+    {
+        if pre == "-w".to_string() || pre == "--word".to_string()
+        {
+            word = String::from(&arg);
+            is_word = true;
+        }
+        if arg == "-r".to_string() || arg == "--random".to_string()
+        {
+            let index = rand::thread_rng().gen_range(0..builtin_words::FINAL.len());
+            word = String::from(builtin_words::FINAL[index]);
+            is_random = true;
+            println!("{}", word);
+        }
+        pre = String::from(&arg);
+    }
     if is_tty
     {
         println!(
@@ -56,16 +77,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         println!("Welcome to wordle, {}!", line.trim());
     }
 
-    let mut word = String::new();
     let mut word_vec = vec![0; 26];
-    if ! is_random
+    if ! is_random && ! is_word
     {
         io::stdin().read_line(&mut word)?;
-    }
-    else
-    {
-        word = "ALPHA".to_string();
-        //
     }
     word = word.trim().to_string().to_ascii_uppercase();
 //    println!("{}", word);
