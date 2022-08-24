@@ -1,6 +1,6 @@
 use console;
-use std::mem;
-use rand::Rng;
+use std::{mem, f32::consts::E};
+use rand::{Rng, SeedableRng, seq::SliceRandom};
 use std::{io::{self, Write}, vec, mem::swap};
 
 mod builtin_words;
@@ -163,10 +163,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
     let mut is_word = false;
     let mut is_difficult = false;
     let mut is_stats = false;
+    let mut is_seed = false;
+    let mut is_day = false;
 
     let mut game_cnt = 0;
     let mut success_cnt = 0;
     let mut success_try_cnt = 0;
+    let mut seed = 0;
+    let mut day = 0;
+
 
     //Handle command line options
     let mut pre: String = "".to_string();
@@ -177,10 +182,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
             word = String::from(&arg);
             is_word = true;
         }
+        if pre == "-s".to_string() || pre == "--seed".to_string()
+        {
+            seed = arg.parse::<u64>().unwrap();
+            is_seed = true;
+        }
+        if pre == "-d".to_string() || pre == "--day".to_string()
+        {
+            day = arg.parse::<usize>().unwrap();
+            is_day = true;
+            //TODO 不能超过答案词库的大小
+        }
         if arg == "-r".to_string() || arg == "--random".to_string()
         {
             is_random = true;
-//            println!("{}", word);
         }
         if arg == "-D".to_string() || arg == "--difficult".to_string()
         {
@@ -192,6 +207,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         }
         pre = String::from(&arg);
     }
+
+    //Check whether parameters conflict
+    if is_word && (is_random || is_seed || is_day)
+    {
+        panic!("Parameters Error");
+    }
+
     if is_tty
     {
         println!(
@@ -204,6 +226,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 //        println!("I am not in a tty. Please print according to test requirements!");
     }
 
+    //Rand
+    let mut R = rand::rngs::StdRng::seed_from_u64(seed);
+    let mut rand_list = vec![0; builtin_words::FINAL.len()];
+    for i in 0..builtin_words::FINAL.len()
+    {
+        rand_list[i] = i;
+    }
+    rand_list.shuffle(&mut R);
+
+    //Day
+    let mut now_day;
+    if is_day
+    {
+        now_day = day;
+    }
+    else
+    {
+        now_day = 1;
+    }
+
     if is_tty
     {
         print!("{}", console::style("Your name: ").bold().red());
@@ -212,7 +254,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         io::stdin().read_line(&mut line)?;
         println!("Welcome to wordle, {}!", line.trim());
     }
-
+    
     while true
     {
         game_cnt += 1;
@@ -220,8 +262,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         let mut word_vec = vec![0; 26];
         if is_random
         {
-            //TODO 保证每次不重复
-            let index = rand::thread_rng().gen_range(0..builtin_words::FINAL.len());
+            let index = rand_list[now_day - 1];
             word = String::from(builtin_words::FINAL[index]);
         }
         if ! is_random && ! is_word
@@ -235,8 +276,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
             let c = word.chars().nth(i).unwrap();
             word_vec[c as usize - 'A' as usize] += 1;
         }
-    //    println!("{:?}", word_vec);
-
         let mut status = vec!['X'; 26];
         let mut count = 0;
         let mut success = false;
@@ -366,7 +405,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
         if is_stats
         {
-            println!("{} {} {:.2}", success_cnt, game_cnt - success_cnt, success_try_cnt as f32 / max(1, success_cnt) as f32);
+            println!("{} {} {:.2}", success_cnt, game_cnt - success_cnt, success_try_cnt as f32 / max(1, success_cnt as i32) as f32);
             stats.print();
         }
 
@@ -382,6 +421,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         {
             break;
         }
+        now_day += 1;
     }
 
     Ok(())
