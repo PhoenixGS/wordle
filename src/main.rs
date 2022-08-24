@@ -4,7 +4,7 @@ use std::{io::{self, Write}, vec};
 
 mod builtin_words;
 
-fn print_c(st: String, c: char) -> ()
+fn print_c(st: String, c: char) -> () //Make the output colored
 {
     match c
     {
@@ -16,7 +16,7 @@ fn print_c(st: String, c: char) -> ()
     }
 }
 
-fn check(guess: &String) -> bool
+fn check(guess: &String) -> bool //Determine whether the word is a valid word
 {
     for s in builtin_words::ACCEPTABLE
     {
@@ -29,7 +29,7 @@ fn check(guess: &String) -> bool
     return false;
 }
 
-fn check_diffcult(guess: &String, pre_delta: &Vec<i32>, delta: &Vec<i32>, pre_out: &Vec<char>, out: &Vec<char>) -> bool
+fn check_diffcult(pre_delta: &Vec<i32>, delta: &Vec<i32>, pre_out: &Vec<char>, out: &Vec<char>) -> bool //Determine whether a word is a valid word in hard mode
 {
     for i in 0..5
     {
@@ -59,6 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
     let mut is_word = false;
     let mut is_difficult = false;
 
+    //Handle command line options
     let mut pre: String = "".to_string();
     for arg in std::env::args()
     {
@@ -181,7 +182,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
             }
         }
 
-        if count > 0 && is_difficult && ! check_diffcult(&guess, &pre_delta, &delta, &res[count - 1], &out)
+        if count > 0 && is_difficult && ! check_diffcult(&pre_delta, &delta, &res[count - 1], &out)
         {
             println!("INVALID");
             continue;
