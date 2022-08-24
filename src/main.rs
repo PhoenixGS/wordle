@@ -2,14 +2,11 @@ use console;
 use std::{mem, f32::consts::E};
 use rand::{Rng, SeedableRng, seq::SliceRandom};
 use std::{io::{self, Write}, vec, mem::swap};
+use std::io::prelude::*;
+use std::fs;
 
 mod builtin_words;
 
-struct Stats
-{
-    count: Vec<i32>,
-    list: Vec<usize>,
-}
 
 fn min(x: i32, y: i32) -> i32
 {
@@ -35,13 +32,134 @@ fn max(x: i32, y: i32) -> i32
     }
 }
 
-impl Stats
+struct Dict
 {
-    fn get_id(guess: &String) -> usize
+    is_final: bool,
+    is_acceptable: bool,
+    FINAL: Vec<String>,
+    ACCEPTABLE: Vec<String>,
+    now_final: usize,
+    now_acceptable: usize,
+}
+
+impl Dict
+{
+    fn check(st: &String, now: &mut usize) -> bool //Determine whether the word is a valid word
     {
+        while now < &mut builtin_words::ACCEPTABLE.len()
+        {
+            let index: usize = *now;
+            if builtin_words::ACCEPTABLE[index].to_string() == *st
+            {
+                return true;
+            }
+            *now += 1;
+        }
+        return false;
+    }
+
+    fn init(&mut self) -> ()
+    {
+        for i in 0..builtin_words::FINAL.len()
+        {
+            self.FINAL.push(builtin_words::FINAL[i].to_string());
+        }
         for i in 0..builtin_words::ACCEPTABLE.len()
         {
-            if builtin_words::ACCEPTABLE[i].to_string().to_ascii_uppercase() == (*guess)
+            self.ACCEPTABLE.push(builtin_words::ACCEPTABLE[i].to_string());
+        }
+        self.now_final = 0;
+        self.now_acceptable = 0;
+    }
+
+    fn get_FINAL(&self) -> &[String]
+    {
+        return &self.FINAL;
+    }
+
+    fn get_ACCEPTABLE(&self) -> &[String]
+    {
+        return &self.ACCEPTABLE;
+    }
+
+    fn get_FINAL_len(&self) -> usize
+    {
+        return self.FINAL.len();
+    }
+
+    fn get_ACCEPTABLE_len(&self) -> usize
+    {
+        return self.ACCEPTABLE.len();
+    }
+
+    fn update_final(&mut self, file_name: &String) -> bool
+    {
+        self.FINAL = vec![];
+        self.is_final = true;
+        let text = fs::read_to_string(file_name).unwrap();
+        for st in text.split('\n')
+        {
+            self.FINAL.push(st.to_string().trim().to_string().to_ascii_lowercase());
+        }
+        self.FINAL.sort();
+        for i in 0..self.FINAL.len() - 1
+        {
+            if self.FINAL[i] == self.FINAL[i + 1]
+            {
+                return false;
+            }
+        }
+        for st in &self.FINAL
+        {
+            if ! Dict::check(&st, &mut self.now_final)
+            {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn update_acceptable(&mut self, file_name: &String) -> bool
+    {
+        self.ACCEPTABLE = vec![];
+        self.is_acceptable = true;
+        let text = fs::read_to_string(file_name).unwrap();
+        for st in text.split('\n')
+        {
+            self.ACCEPTABLE.push(st.to_string().trim().to_string().to_ascii_lowercase());
+        }
+        self.ACCEPTABLE.sort();
+        for i in 0..self.ACCEPTABLE.len() - 1
+        {
+            if self.ACCEPTABLE[i] == self.ACCEPTABLE[i + 1]
+            {
+                return false;
+            }
+        }
+        for st in &self.ACCEPTABLE
+        {
+            if ! Dict::check(&st, &mut self.now_acceptable)
+            {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+struct Stats
+{
+    count: Vec<i32>,
+    list: Vec<usize>,
+}
+
+impl Stats
+{
+    fn get_id(guess: &String, dict: &Dict) -> usize
+    {
+        for i in 0..dict.get_ACCEPTABLE_len()
+        {
+            if dict.get_ACCEPTABLE()[i].to_ascii_uppercase() == (*guess)
             {
                 return i;
             }
@@ -49,9 +167,9 @@ impl Stats
         panic!("ERROR");
     }
 
-    fn update(&mut self, guess: &String) -> ()
+    fn update(&mut self, guess: &String, dict: &mut Dict) -> ()
     {
-        let index = Stats::get_id(guess);
+        let index = Stats::get_id(guess, &dict);
         self.count[index] += 1;
         let mut now: usize = usize::MAX;
         for i in 0..self.list.len()
@@ -91,7 +209,7 @@ impl Stats
         }
     }
 
-    fn print(&mut self) -> ()
+    fn print(&mut self, dict: &Dict) -> ()
     {
         for i in 0..min(self.list.len() as i32, 5) as usize
         {
@@ -99,7 +217,7 @@ impl Stats
             {
                 print!(" ");
             }
-            print!("{} {}", builtin_words::ACCEPTABLE[self.list[i]].to_string().to_ascii_uppercase(), self.count[self.list[i]]);
+            print!("{} {}", dict.get_ACCEPTABLE()[self.list[i]].to_ascii_uppercase(), self.count[self.list[i]]);
         }
         println!("");
     }
@@ -117,9 +235,9 @@ fn print_c(st: String, c: char) -> () //Make the output colored
     }
 }
 
-fn check(guess: &String) -> bool //Determine whether the word is a valid word
+fn check(guess: &String, dict: &Dict) -> bool //Determine whether the word is a valid word
 {
-    for s in builtin_words::ACCEPTABLE
+    for s in dict.get_ACCEPTABLE()
     {
 //        println!("{} {}", (*s).to_string().to_ascii_uppercase(), (*guess));
         if (*s).to_string().to_ascii_uppercase() == (*guess)
@@ -152,7 +270,9 @@ fn check_diffcult(pre_delta: &Vec<i32>, delta: &Vec<i32>, pre_out: &Vec<char>, o
 /// The main function for the Wordle game, implement your own logic here
 fn main() -> Result<(), Box<dyn std::error::Error>>
 {
-    let mut stats = Stats{count: vec![0; builtin_words::ACCEPTABLE.len()], list: vec![]};
+
+    let mut dict = Dict{is_final: false, is_acceptable: false, FINAL: vec![], ACCEPTABLE: vec![], now_final: 0, now_acceptable: 0};
+    dict.init();
 
     let is_tty = atty::is(atty::Stream::Stdout);
 
@@ -165,13 +285,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
     let mut is_stats = false;
     let mut is_seed = false;
     let mut is_day = false;
+    let mut is_final = false;
+    let mut is_acceptable = false;
 
     let mut game_cnt = 0;
     let mut success_cnt = 0;
     let mut success_try_cnt = 0;
     let mut seed = 0;
     let mut day = 0;
-
 
     //Handle command line options
     let mut pre: String = "".to_string();
@@ -193,6 +314,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
             is_day = true;
             //TODO 不能超过答案词库的大小
         }
+        if pre == "-f".to_string() || pre == "--final-set".to_string()
+        {
+            if ! dict.update_final(&arg)
+            {
+                panic!("Final Set Error");
+            }
+            is_final = true;
+        }
+        if pre == "-a".to_string() || pre == "--acceptable-set".to_string()
+        {
+            if ! dict.update_acceptable(&arg)
+            {
+                panic!("Acceptable Set Error");
+            }
+            is_acceptable = true;
+        }
         if arg == "-r".to_string() || arg == "--random".to_string()
         {
             is_random = true;
@@ -207,6 +344,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         }
         pre = String::from(&arg);
     }
+
+    //Stats
+    let mut stats = Stats{count: vec![0; dict.get_ACCEPTABLE_len()], list: vec![]};
 
     //Check whether parameters conflict
     if is_word && (is_random || is_seed || is_day)
@@ -228,8 +368,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
     //Rand
     let mut R = rand::rngs::StdRng::seed_from_u64(seed);
-    let mut rand_list = vec![0; builtin_words::FINAL.len()];
-    for i in 0..builtin_words::FINAL.len()
+    let mut rand_list = vec![0; dict.get_FINAL_len()];
+    for i in 0..dict.get_FINAL_len()
     {
         rand_list[i] = i;
     }
@@ -263,7 +403,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         if is_random
         {
             let index = rand_list[now_day - 1];
-            word = String::from(builtin_words::FINAL[index]);
+            word = dict.get_FINAL()[index].clone();
         }
         if ! is_random && ! is_word
         {
@@ -288,7 +428,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
             let mut guess_vec = vec![0; 26];
             io::stdin().read_line(&mut guess)?;
             guess = guess.trim().to_string().to_ascii_uppercase();
-            if ! check(&guess)
+            if ! check(&guess, &mut dict)
             {
                 println!("INVALID");
                 continue;
@@ -348,7 +488,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
                 continue;
             }
 
-            stats.update(&guess);
+            stats.update(&guess, &mut dict);
 
             count += 1;
             status = new_status.clone();
@@ -406,7 +546,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         if is_stats
         {
             println!("{} {} {:.2}", success_cnt, game_cnt - success_cnt, success_try_cnt as f32 / max(1, success_cnt as i32) as f32);
-            stats.print();
+            stats.print(&mut dict);
         }
 
         if ! is_word
