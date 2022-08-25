@@ -1,5 +1,9 @@
 # Honor Code
 
+## Cargo配置
+
+[https://blog.51cto.com/u_15187242/5250330](https://blog.51cto.com/u_15187242/5250330)
+
 ## 字符串处理
 
 [https://blog.csdn.net/ap114/article/details/119947997](https://blog.csdn.net/ap114/article/details/119947997)
