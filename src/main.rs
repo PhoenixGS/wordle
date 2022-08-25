@@ -230,8 +230,75 @@ impl Stats
     }
 }
 
-//Save Part
+struct Help
+{
+    list: Vec<String>,
+}
 
+impl Help
+{
+    fn update(&mut self, out: &Vec<char>, guess: &String) -> ()
+    {
+        let tar = &guess.to_ascii_lowercase();
+        let mut new_list = vec![];
+        for st in &self.list
+        {
+            let mut is_ok = true;
+            let mut cnt = vec![0; 26];
+            let mut not = vec![false; 26];
+            for i in 0..5
+            {
+                if out[i] == 'G'
+                {
+                    if st.chars().nth(i).unwrap() != tar.chars().nth(i).unwrap()
+                    {
+                        is_ok = false;
+                    }
+                }
+                else
+                {
+                    if st.chars().nth(i).unwrap() == tar.chars().nth(i).unwrap()
+                    {
+                        is_ok = false;
+                    }
+                    cnt[st.chars().nth(i).unwrap() as usize - 'a' as usize] += 1;
+                }
+                if out[i] == 'Y'
+                {
+                    cnt[tar.chars().nth(i).unwrap() as usize - 'a' as usize] -= 1;
+                }
+                if out[i] == 'R'
+                {
+                    not[tar.chars().nth(i).unwrap() as usize - 'a' as usize] = true;
+                }
+            }
+            for i in 0..26
+            {
+                if not[i]
+                {
+                    if cnt[i] != 0
+                    {
+                        is_ok = false;
+                    }
+                }
+                else
+                {
+                    if cnt[i] < 0
+                    {
+                        is_ok = false;
+                    }
+                }
+            }
+            if is_ok
+            {
+                new_list.push((*st).clone());
+            }
+        }
+        self.list = new_list.clone();
+    }
+}
+
+//Save Part
 #[derive(Serialize, Deserialize)]
 struct Game
 {
@@ -478,7 +545,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
     if is_state
     {
         let middle = fs::read_to_string(&save.as_str());
-        
         match middle
         {
             Ok(json) =>
@@ -579,6 +645,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
     {
         state.total_rounds += 1;
 
+        //Help
+        let mut help = Help{list: dict.ACCEPTABLE.clone()};
+
         let mut word_vec = vec![0; 26];
         if is_random
         {
@@ -614,6 +683,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
             let mut guess_vec = vec![0; 26];
             io::stdin().read_line(&mut guess)?;
             guess = guess.trim().to_string().to_ascii_uppercase();
+
+            if guess == "HELP!"
+            {
+                println!("{:?}", help.list);
+                continue;
+            }
+
             if ! check(&guess, &mut dict)
             {
                 println!("INVALID");
@@ -673,6 +749,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
                 println!("INVALID");
                 continue;
             }
+
+            //Update help
+            help.update(&out, &guess);
 
             stats.update(&guess);
 
@@ -736,7 +815,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         {
             if is_tty
             {
-                println!("What a pity!")
+                println!("What a pity! The answer is \"{}\"", word);
             }
             else
             {
