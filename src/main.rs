@@ -587,6 +587,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         }
         if ! is_random && ! is_word
         {
+            print!("{}", console::style("Enter the answer: ").green());
+            io::stdout().flush().unwrap();
             word = String::new();
             io::stdin().read_line(&mut word)?;
         }
@@ -716,13 +718,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
         if success
         {
-            println!("CORRECT {}", count);
+            if is_tty
+            {
+                println!("Congratulation! You win!");
+            }
+            else
+            {
+                println!("CORRECT {}", count);
+            }
             success_cnt += 1;
             success_try_cnt += count;
         }
         else
         {
-            println!("FAILED {}", word);
+            if is_tty
+            {
+                println!("What a pity!")
+            }
+            else
+            {
+                println!("FAILED {}", word);
+            }
         }
 
         if is_stats
@@ -733,6 +749,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
         if ! is_word
         {
+            if is_tty
+            {
+                println!("Do you wanna play again? (Y/N)");
+            }
             let mut next_game = String::new();
             if io::stdin().read_line(&mut next_game).unwrap() == 0 || next_game.trim().to_string() == "N".to_string()
             {
