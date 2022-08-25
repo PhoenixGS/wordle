@@ -4,6 +4,11 @@ use rand::{Rng, SeedableRng, seq::SliceRandom};
 use std::{io::{self, Write}, vec, mem::swap};
 use std::io::prelude::*;
 use std::fs;
+use serde::{Deserialize, Serialize};
+use std::fs::File;
+use serde_json::{json, Value};
+use serde_json::from_str;
+use valico::json_schema;
 
 mod builtin_words;
 
@@ -155,21 +160,23 @@ struct Stats
 
 impl Stats
 {
-    fn get_id(guess: &String, dict: &Dict) -> usize
+    fn get_id(guess: &String) -> usize
     {
-        for i in 0..dict.get_ACCEPTABLE_len()
+        for i in 0..builtin_words::ACCEPTABLE.len()
         {
-            if dict.get_ACCEPTABLE()[i].to_ascii_uppercase() == (*guess)
+            if builtin_words::ACCEPTABLE[i].to_string().to_ascii_uppercase() == (*guess)
             {
                 return i;
             }
+//            println!("{}", builtin_words::ACCEPTABLE[i].to_string().to_ascii_uppercase());
         }
+        println!("{}", guess);
         panic!("ERROR");
     }
 
-    fn update(&mut self, guess: &String, dict: &mut Dict) -> ()
+    fn update(&mut self, guess: &String) -> ()
     {
-        let index = Stats::get_id(guess, &dict);
+        let index = Stats::get_id(guess);
         self.count[index] += 1;
         let mut now: usize = usize::MAX;
         for i in 0..self.list.len()
@@ -209,7 +216,7 @@ impl Stats
         }
     }
 
-    fn print(&mut self, dict: &Dict) -> ()
+    fn print(&mut self) -> ()
     {
         for i in 0..min(self.list.len() as i32, 5) as usize
         {
@@ -217,13 +224,36 @@ impl Stats
             {
                 print!(" ");
             }
-            print!("{} {}", dict.get_ACCEPTABLE()[self.list[i]].to_ascii_uppercase(), self.count[self.list[i]]);
+            print!("{} {}", builtin_words::ACCEPTABLE[self.list[i]].to_string().to_ascii_uppercase(), self.count[self.list[i]]);
         }
         println!("");
     }
 }
 
-fn print_c(st: String, c: char) -> () //Make the output colored
+//Save Part
+
+#[derive(Serialize, Deserialize)]
+struct Game
+{
+    answer: String,
+    guesses: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct State
+{
+    total_rounds: usize,
+    games: Vec<Game>,
+}
+
+fn read_json_typed(raw_json: &str) -> State {
+    let parsed: State = serde_json::from_str(raw_json).unwrap();
+    return parsed
+    
+}
+
+//Make the output colored
+fn print_c(st: String, c: char) -> ()
 {
     match c
     {
@@ -235,7 +265,8 @@ fn print_c(st: String, c: char) -> () //Make the output colored
     }
 }
 
-fn check(guess: &String, dict: &Dict) -> bool //Determine whether the word is a valid word
+//Determine whether the word is a valid word
+fn check(guess: &String, dict: &Dict) -> bool
 {
     for s in dict.get_ACCEPTABLE()
     {
@@ -270,7 +301,6 @@ fn check_diffcult(pre_delta: &Vec<i32>, delta: &Vec<i32>, pre_out: &Vec<char>, o
 /// The main function for the Wordle game, implement your own logic here
 fn main() -> Result<(), Box<dyn std::error::Error>>
 {
-
     let mut dict = Dict{is_final: false, is_acceptable: false, FINAL: vec![], ACCEPTABLE: vec![], now_final: 0, now_acceptable: 0};
     dict.init();
 
@@ -287,12 +317,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
     let mut is_day = false;
     let mut is_final = false;
     let mut is_acceptable = false;
+    let mut is_state = false;
 
-    let mut game_cnt = 0;
     let mut success_cnt = 0;
     let mut success_try_cnt = 0;
     let mut seed = 0;
     let mut day = 0;
+    let mut save = String::new();
 
     //Handle command line options
     let mut pre: String = "".to_string();
@@ -330,6 +361,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
             }
             is_acceptable = true;
         }
+        if pre == "-S".to_string() || pre == "--state".to_string()
+        {
+            save = arg.to_string();
+            is_state = true;
+        }
         if arg == "-r".to_string() || arg == "--random".to_string()
         {
             is_random = true;
@@ -347,6 +383,61 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
     //Stats
     let mut stats = Stats{count: vec![0; dict.get_ACCEPTABLE_len()], list: vec![]};
+
+    //State
+    let mut state: State = State{total_rounds: 0, games: vec![]};
+    if is_state
+    {
+        let middle = fs::read_to_string(&save.as_str());
+        
+        match middle
+        {
+            Ok(json) =>
+            {
+                let v: Result<Value, serde_json::Error> = serde_json::from_str(&json.as_str());
+                match v
+                {
+                    Ok(T) =>
+                    {
+                        let z = T["total_rounds"].to_string().parse::<i32>();
+                        match z
+                        {
+                            Ok(rounds) =>
+                            {
+                                state.total_rounds = rounds as usize;
+                                for i in 0..state.total_rounds
+                                {
+//                                    let str = T["games"][i]["answer"].as_str().unwrap();
+//                                    println!("{} {}", str, T["games"][i]["answer"].to_string());
+                                    state.games.push(Game{answer: T["games"][i]["answer"].as_str().unwrap().to_string(), guesses: vec![]});
+                                    for st in T["games"][i]["guesses"].as_array().unwrap()
+                                    {
+                                        state.games[i].guesses.push(st.as_str().unwrap().to_string());
+                                    }
+                                }
+                            },
+                            _ => ()
+                        }
+                    },
+                    Err(T) => return Err(Box::new(T)),
+                }
+//                state = read_json_typed(&json.as_str())
+            },
+            _ => ()
+        }
+    }
+    for game in &state.games
+    {
+        if game.guesses[game.guesses.len() - 1] == game.answer
+        {
+            success_cnt += 1;
+            success_try_cnt += game.guesses.len();
+        }
+        for st in &game.guesses
+        {
+            stats.update(&st.to_ascii_uppercase());
+        }
+    }
 
     //Check whether parameters conflict
     if is_word && (is_random || is_seed || is_day)
@@ -397,7 +488,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
     
     while true
     {
-        game_cnt += 1;
+        state.total_rounds += 1;
 
         let mut word_vec = vec![0; 26];
         if is_random
@@ -411,6 +502,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
             io::stdin().read_line(&mut word)?;
         }
         word = word.trim().to_string().to_ascii_uppercase();
+        state.games.push(Game{answer: word.to_ascii_uppercase(), guesses: vec![]});
         for i in 0..5
         {
             let c = word.chars().nth(i).unwrap();
@@ -488,13 +580,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
                 continue;
             }
 
-            stats.update(&guess, &mut dict);
+            stats.update(&guess);
 
             count += 1;
             status = new_status.clone();
 
             res.push(out);
-            words.push(guess);
+            words.push(guess.clone());
+            state.games[state.total_rounds - 1].guesses.push(guess.to_ascii_uppercase());
             if ! is_tty
             {
                 for i in 0..5
@@ -545,8 +638,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
         if is_stats
         {
-            println!("{} {} {:.2}", success_cnt, game_cnt - success_cnt, success_try_cnt as f32 / max(1, success_cnt as i32) as f32);
-            stats.print(&mut dict);
+            println!("{} {} {:.2}", success_cnt, state.total_rounds - success_cnt, success_try_cnt as f32 / max(1, success_cnt as i32) as f32);
+            stats.print();
         }
 
         if ! is_word
@@ -562,6 +655,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
             break;
         }
         now_day += 1;
+    }
+
+    if is_state
+    {
+        let json = serde_json::to_string(&state).unwrap();
+        let mut file = File::create(&save.as_str()).unwrap();
+        file.write(json.as_bytes()).unwrap();
     }
 
     Ok(())
