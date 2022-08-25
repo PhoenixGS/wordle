@@ -151,6 +151,7 @@ impl Dict
 struct Help
 {
     list: Vec<String>,
+    ans_list: Vec<String>,
 }
 
 impl Help
@@ -158,6 +159,7 @@ impl Help
     fn update(&mut self, out: &Vec<char>, guess: &String) -> ()
     {
         let tar = &guess.to_ascii_lowercase();
+
         let mut new_list = vec![];
         for st in &self.list
         {
@@ -213,6 +215,62 @@ impl Help
             }
         }
         self.list = new_list.clone();
+
+        new_list = vec![];
+        for st in &self.ans_list
+        {
+            let mut is_ok = true;
+            let mut cnt = vec![0; 26];
+            let mut not = vec![false; 26];
+            for i in 0..5
+            {
+                if out[i] == 'G'
+                {
+                    if st.chars().nth(i).unwrap() != tar.chars().nth(i).unwrap()
+                    {
+                        is_ok = false;
+                    }
+                }
+                else
+                {
+                    if st.chars().nth(i).unwrap() == tar.chars().nth(i).unwrap()
+                    {
+                        is_ok = false;
+                    }
+                    cnt[st.chars().nth(i).unwrap() as usize - 'a' as usize] += 1;
+                }
+                if out[i] == 'Y'
+                {
+                    cnt[tar.chars().nth(i).unwrap() as usize - 'a' as usize] -= 1;
+                }
+                if out[i] == 'R'
+                {
+                    not[tar.chars().nth(i).unwrap() as usize - 'a' as usize] = true;
+                }
+            }
+            for i in 0..26
+            {
+                if not[i]
+                {
+                    if cnt[i] != 0
+                    {
+                        is_ok = false;
+                    }
+                }
+                else
+                {
+                    if cnt[i] < 0
+                    {
+                        is_ok = false;
+                    }
+                }
+            }
+            if is_ok
+            {
+                new_list.push((*st).clone());
+            }
+        }
+        self.ans_list = new_list.clone();
     }
 }
 
@@ -312,12 +370,6 @@ struct State
     games: Vec<Game>,
 }
 
-fn read_json_typed(raw_json: &str) -> State {
-    let parsed: State = serde_json::from_str(raw_json).unwrap();
-    return parsed
-    
-}
-
 //Make the output colored
 fn print_c(st: String, c: char) -> ()
 {
@@ -344,6 +396,57 @@ fn check(guess: &String, dict: &Dict) -> bool
     return false;
 }
 
+fn test(gs: &String, dict: &Dict) -> f64
+{
+    let mut guess = (*gs).clone();
+
+    let mut count = 0;
+
+    for answer in &dict.FINAL
+    {
+        //println!("{}", answer);
+        let mut help = Help{list: dict.ACCEPTABLE.clone(), ans_list: dict.FINAL.clone()};
+        let mut recomm = Recomm{map: vec![]};
+    
+        while true
+        {
+            let mut res = Recomm::calc(answer, &guess);
+
+            count += 1;
+    
+            if res == 0
+            {
+                break;
+            }
+
+            let mut out: Vec<char> = vec!['X'; 5];
+            for i in 0..5
+            {
+                if res % 3 == 0
+                {
+                    out[4 - i] = 'G';
+                }
+                if res % 3 == 1
+                {
+                    out[4 - i] = 'Y';
+                }
+                if res % 3 == 2
+                {
+                    out[4 - i] = 'R';
+                }
+                res = res / 3;
+            }
+
+            help.update(&out, &guess);
+    
+            let nex = recomm.give_words(&help.list, &help.ans_list);
+            let st = nex[0].0.clone();
+            guess = st.clone();
+        }
+    }
+    return count as f64 / dict.FINAL.len() as f64;
+}
+
 /// The main function for the Wordle game, implement your own logic here
 fn main() -> Result<(), Box<dyn std::error::Error>>
 {
@@ -353,9 +456,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
     let is_tty = atty::is(atty::Stream::Stdout);
 
     let mut word = String::new();
+    
+    let mut is_test = false;
+    let mut is_stat = false;
 
-    let mut success_cnt = 0;
-    let mut success_try_cnt = 0;
+    for arg in std::env::args()
+    {
+        if arg == "-t".to_string() || arg == "--test".to_string()
+        {
+            is_test = true;
+        }
+        if arg == "-s".to_string() || arg == "--stat".to_string()
+        {
+            is_stat = true;
+        }
+    }
+
+    if is_stat
+    {
+        let mut sum = 0.0;
+        for guess in &dict.ACCEPTABLE
+        {
+            let aver = test(guess, &dict);
+            println!("{} {}", guess, aver);
+            sum += aver;
+        }
+        sum /= dict.ACCEPTABLE.len() as f64;
+        println!("All Average: {}", sum);
+        return Ok(());
+    }
 
     let mut guess = String::new();
     print!("{}", console::style("Pick a word:").green());
@@ -365,14 +494,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
     io::stdin().read_line(&mut guess);
     guess = guess.trim().to_string().to_ascii_lowercase();
     
-    let mut help = Help{list: dict.ACCEPTABLE.clone()};
+    if is_test
+    {
+        println!("Average: {}", test(&guess, &dict));
+        return Ok(());
+    }
+
+    let mut help = Help{list: dict.ACCEPTABLE.clone(), ans_list: dict.FINAL.clone()};
     let mut recomm = Recomm{map: vec![]};
+
+    let mut count = 0;
 
     while true
     {
         let mut output = String::new();
+
         io::stdin().read_line(&mut output);
         output = output.trim().to_string().to_ascii_uppercase();
+
+        count += 1;
 
         if output == "GGGGG"
         {
@@ -386,11 +526,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         }
         help.update(&out, &guess);
 
-        //println!("list len: {}", help.list.len());
-        //println!("{:?}", out);
-        //println!("{:?}", help.list);
-
-        let nex = recomm.give_words(&help.list, &dict.FINAL);
+        let nex = recomm.give_words(&help.list, &help.ans_list);
         let st = nex[0].0.clone();
         println!("{}", st);
         if help.list.len() == 1
@@ -400,7 +536,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         guess = st.clone();
     }
 
-    println!("Congratulation!");
+    println!("Congratulation! You have just tried {} time(s)!", count);
 
     Ok(())
 }
