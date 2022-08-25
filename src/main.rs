@@ -587,8 +587,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         }
         if ! is_random && ! is_word
         {
-            print!("{}", console::style("Enter the answer: ").green());
-            io::stdout().flush().unwrap();
+            if is_tty
+            {
+                print!("{}", console::style("Enter the answer: ").green());
+                io::stdout().flush().unwrap();
+            }
             word = String::new();
             io::stdin().read_line(&mut word)?;
         }
