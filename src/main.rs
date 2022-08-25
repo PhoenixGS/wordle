@@ -298,6 +298,87 @@ impl Help
     }
 }
 
+struct Recomm
+{
+    map: Vec<(f64, String)>,
+}
+
+impl Recomm
+{
+    fn calc(answer: &String, guess: &String) -> usize
+    {
+        let mut res:Vec<i32> = vec![-1; 5];
+        let mut delta = vec![0; 26];
+        for i in 0..5
+        {
+            delta[answer.chars().nth(i).unwrap() as usize - 'a' as usize] += 1;
+        }
+        for i in 0..5
+        {
+            if answer.chars().nth(i).unwrap() == guess.chars().nth(i).unwrap()
+            {
+                res[i] = 0;
+                delta[guess.chars().nth(i).unwrap() as usize - 'a' as usize] -= 1;
+            }
+        }
+        for i in 0..5
+        {
+            if res[i] != 0
+            {
+                let index = guess.chars().nth(i).unwrap() as usize - 'a' as usize;
+                if delta[index] > 0
+                {
+                    delta[index] -= 1;
+                    res[i] = 1;
+                }
+                else
+                {
+                    res[i] = 2;
+                }
+            }
+        }
+        let mut ret: usize = 0;
+        for i in 0..5
+        {
+            ret = ret * 3 + res[i] as usize;
+        }
+        return ret;
+    }
+
+    fn give_words(&mut self, list: &Vec<String>) -> Vec<(String, f64)>
+    {
+        self.map = vec![];
+        for i in 0..(*list).len()
+        {
+            let s1 = &list[i];
+            let mut count = vec![0; 243];
+            let mut sum = 0;
+            for s2 in (*list).clone()
+            {
+                count[Recomm::calc(&s2, s1)] += 1;
+                sum += 1;
+            }
+            let mut key = 0.0;
+            for j in 0..243
+            {
+                let pr = count[j] as f64 / sum as f64;
+                if count[j] != 0
+                {
+                    key += pr * -pr.log2();
+                }
+            }
+            self.map.push((-key, (*s1).clone()));
+        }
+        self.map.sort_by_cached_key(|k| ((*k).0 * 1000000.0) as i32);
+        let mut res = vec![];
+        for i in 0..min(self.map.len() as i32, 5) as usize
+        {
+            res.push((self.map[i].1.clone(), -self.map[i].0));
+        }
+        return res.clone();
+    }
+}
+
 //Save Part
 #[derive(Serialize, Deserialize)]
 struct Game
@@ -647,6 +728,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
         //Help
         let mut help = Help{list: dict.ACCEPTABLE.clone()};
+        let mut recomm = Recomm{map: vec![]};
 
         let mut word_vec = vec![0; 26];
         if is_random
@@ -687,6 +769,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
             if guess == "HELP!"
             {
                 println!("{:?}", help.list);
+                continue;
+            }
+
+            if guess == "ASK!"
+            {
+                println!("{:?}", recomm.give_words(&help.list));
                 continue;
             }
 
