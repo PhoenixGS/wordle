@@ -318,15 +318,92 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
     let mut is_final = false;
     let mut is_acceptable = false;
     let mut is_state = false;
+    let mut is_config = false;
 
     let mut success_cnt = 0;
     let mut success_try_cnt = 0;
     let mut seed = 0;
     let mut day = 0;
+    let mut final_set = String::new();
+    let mut acceptable_set = String::new();
     let mut save = String::new();
+    let mut config = String::new();
+
+    //Load config
+    let mut pre: String = "".to_string();
+    for arg in std::env::args()
+    {
+        if pre == "-c".to_string() || pre == "--config".to_string()
+        {
+            config = arg.to_string();
+            is_config = true;
+        }
+        pre = String::from(&arg);
+    }
+    if is_config
+    {
+        let middle = fs::read_to_string(&config.as_str());
+        match middle
+        {
+            Ok(json) =>
+            {
+                let value: Result<Value, serde_json::Error> = serde_json::from_str(&json.as_str());
+                match value
+                {
+                    Ok(T) =>
+                    {
+                        if T["random"].as_bool() != None
+                        {
+                            is_random = T["random"].as_bool().unwrap();
+                        }
+                        if T["difficult"].as_bool() != None
+                        {
+                            is_difficult = T["difficult"].as_bool().unwrap();
+                        }
+                        if T["stats"].as_bool() != None
+                        {
+                            is_stats = T["stats"].as_bool().unwrap();
+                        }
+                        if T["day"].as_u64() != None
+                        {
+                            day = T["day"].as_u64().unwrap() as usize;
+                            is_day = true;
+                        }
+                        if T["seed"].as_u64() != None
+                        {
+                            seed = T["seed"].as_u64().unwrap();
+                            is_seed = true;
+                        }
+                        if T["final_set"].as_str() != None
+                        {
+                            final_set = T["final_set"].as_str().unwrap().to_string();
+                            is_final = true;
+                        }
+                        if T["acceptable_set"].as_str() != None
+                        {
+                            acceptable_set = T["acceptable_set"].as_str().unwrap().to_string();
+                            is_acceptable = true;
+                        }
+                        if T["state"].as_str() != None
+                        {
+                            save = T["state"].as_str().unwrap().to_string();
+                            is_state = true;
+                        }
+                        if T["word"].as_str() != None
+                        {
+                            word = T["word"].as_str().unwrap().to_string();
+                            is_word = true;
+                        }
+                    },
+                    Err(T) => return Err(Box::new(T))
+                }
+            },
+            _ => ()
+        }
+    }
 
     //Handle command line options
-    let mut pre: String = "".to_string();
+    pre = "".to_string();
     for arg in std::env::args()
     {
         if pre == "-w".to_string() || pre == "--word".to_string()
@@ -347,18 +424,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         }
         if pre == "-f".to_string() || pre == "--final-set".to_string()
         {
-            if ! dict.update_final(&arg)
-            {
-                panic!("Final Set Error");
-            }
+            final_set = arg.to_string();
             is_final = true;
         }
         if pre == "-a".to_string() || pre == "--acceptable-set".to_string()
         {
-            if ! dict.update_acceptable(&arg)
-            {
-                panic!("Acceptable Set Error");
-            }
+            acceptable_set = arg.to_string();
             is_acceptable = true;
         }
         if pre == "-S".to_string() || pre == "--state".to_string()
@@ -379,6 +450,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
             is_stats = true;
         }
         pre = String::from(&arg);
+    }
+
+    //Final-Set
+    if is_final
+    {
+        if ! dict.update_final(&final_set)
+        {
+            panic!("Final Set Error");
+        }
+    }
+
+    //Acceptable-Set
+    if is_acceptable
+    {
+        if ! dict.update_acceptable(&acceptable_set)
+        {
+            panic!("Acceptable Set Error");
+        }
     }
 
     //Stats
