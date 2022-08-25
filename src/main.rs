@@ -1,14 +1,10 @@
 use console;
-use std::{mem, f32::consts::E};
-use rand::{Rng, SeedableRng, seq::SliceRandom};
-use std::{io::{self, Write}, vec, mem::swap};
-use std::io::prelude::*;
+use rand::{SeedableRng, seq::SliceRandom};
+use std::{io::{self, Write}, vec};
 use std::fs;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
-use serde_json::{json, Value};
-use serde_json::from_str;
-use valico::json_schema;
+use serde_json::Value;
 
 mod builtin_words;
 
@@ -168,7 +164,6 @@ impl Stats
             {
                 return i;
             }
-//            println!("{}", builtin_words::ACCEPTABLE[i].to_string().to_ascii_uppercase());
         }
         println!("{}", guess);
         panic!("ERROR");
@@ -418,7 +413,6 @@ fn check(guess: &String, dict: &Dict) -> bool
 {
     for s in dict.get_ACCEPTABLE()
     {
-//        println!("{} {}", (*s).to_string().to_ascii_uppercase(), (*guess));
         if (*s).to_string().to_ascii_uppercase() == (*guess)
         {
             return true;
@@ -568,7 +562,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         {
             day = arg.parse::<usize>().unwrap();
             is_day = true;
-            //TODO 不能超过答案词库的大小
         }
         if pre == "-f".to_string() || pre == "--final-set".to_string()
         {
@@ -643,8 +636,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
                                 state.total_rounds = rounds as usize;
                                 for i in 0..state.total_rounds
                                 {
-//                                    let str = T["games"][i]["answer"].as_str().unwrap();
-//                                    println!("{} {}", str, T["games"][i]["answer"].to_string());
                                     state.games.push(Game{answer: T["games"][i]["answer"].as_str().unwrap().to_string(), guesses: vec![]});
                                     for st in T["games"][i]["guesses"].as_array().unwrap()
                                     {
@@ -657,7 +648,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
                     },
                     Err(T) => return Err(Box::new(T)),
                 }
-//                state = read_json_typed(&json.as_str())
             },
             _ => ()
         }
@@ -688,10 +678,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
             console::style("colorful characters").bold().blink().blue()
         );
     }
-    else
-    {
-//        println!("I am not in a tty. Please print according to test requirements!");
-    }
 
     //Rand
     let mut R = rand::rngs::StdRng::seed_from_u64(seed);
@@ -701,6 +687,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         rand_list[i] = i;
     }
     rand_list.shuffle(&mut R);
+
+    //Check whether Day is proper
+    if is_day
+    {
+        if day > rand_list.len()
+        {
+            panic!("Day ERROR");
+        }
+    }
 
     //Day
     let mut now_day;
@@ -759,6 +754,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         let mut res = vec![];
         let mut words = vec![];
         let mut pre_delta = vec![];
+
         while count < 6
         {
             let mut guess = String::new();
