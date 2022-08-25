@@ -1,9 +1,21 @@
 [package]
 name = "wordle"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "wordle"
+path = "src/main.rs"
+
+[[bin]]
+name = "solver"
+path = "src/solver.rs"
+
+[[bin]]
+name = "data_init"
+path = "src/data_init.rs"
 
 [dependencies]
 atty = "0.2"
