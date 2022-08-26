@@ -5,6 +5,7 @@ use std::fs;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use serde_json::Value;
+use std::process::Command;
 
 mod builtin_words;
 
@@ -710,6 +711,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
     if is_tty
     {
+        print!("\x1b[2J");
+        print!("\x1b[H");
         print!("{}", console::style("Your name: ").bold().red());
         io::stdout().flush().unwrap();
         let mut line = String::new();
@@ -759,6 +762,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         {
             let mut guess = String::new();
             let mut guess_vec = vec![0; 26];
+
+            if is_tty
+            {
+                print!("{}", console::style("Guess a word: ").green());
+                io::stdout().flush().unwrap();
+            }
+
             io::stdin().read_line(&mut guess)?;
             guess = guess.trim().to_string().to_ascii_uppercase();
 
@@ -860,6 +870,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
             }
             else
             {
+                print!("\x1b[2J");
+                print!("\x1b[H");
                 for i in 0..count
                 {
                     for j in 0..5
@@ -868,9 +880,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
                     }
                     println!("");
                 }
-                for i in 0..26
+                /*for i in 0..26
                 {
                     print_c(((i as u8 + 65) as char).to_string(), status[i]);
+                }
+                println!("");*/
+                for c in ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P']
+                {
+                    print_c(c.to_string(), status[c as usize - 'A' as usize]);
+                    print!(" ");
+                }
+                println!("");
+                print!(" ");
+                for c in ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L']
+                {
+                    print_c(c.to_string(), status[c as usize - 'A' as usize]);
+                    print!(" ");
+                }
+                println!("");
+                print!("  ");
+                for c in ['Z', 'X', 'C', 'V', 'B', 'N', 'M']
+                {
+                    print_c(c.to_string(), status[c as usize - 'A' as usize]);
+                    print!(" ");
                 }
                 println!("");
             }
@@ -886,7 +918,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         {
             if is_tty
             {
-                println!("Congratulation! You win!");
+                println!("{}", console::style("Congratulation! You win!").bold().red());
             }
             else
             {
@@ -899,7 +931,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         {
             if is_tty
             {
-                println!("What a pity! The answer is \"{}\"", word);
+                println!("What a pity! The answer is \"{}\"", console::style(&word).bold().green());
             }
             else
             {
@@ -917,7 +949,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
         {
             if is_tty
             {
-                println!("Do you wanna play again? (Y/N)");
+                println!("{}", console::style("Do you wanna play again? (Y/N)").blink().green());
             }
             let mut next_game = String::new();
             if io::stdin().read_line(&mut next_game).unwrap() == 0 || next_game.trim().to_string() == "N".to_string()
