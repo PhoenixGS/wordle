@@ -22,3 +22,5 @@
 ## Solver
 
 [https://jonathanolson.net/wordle-solver/](https://jonathanolson.net/wordle-solver/)
+[https://www.bilibili.com/video/BV1zZ4y1k7Jw](https://www.bilibili.com/video/BV1zZ4y1k7Jw)
+[https://www.bilibili.com/video/BV1A3411p7Xv](https://www.bilibili.com/video/BV1A3411p7Xv)
